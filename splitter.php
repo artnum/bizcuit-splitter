@@ -8,18 +8,31 @@ define('RATIO', DENSITY / 25.4);
 define('QRSIZE', 60 * RATIO);
 define('QRYPOS', 5 * RATIO);
 
+use Generator;
 use setasign\Fpdi\Tfpdf\Fpdi;
 use Imagick;
 use ImagickPixel;
 use Zxing\QrReader;
 
-function blank () {
-
+function getPDFFormat ($pdf) {
+    $page = intval($pdf->GetPageHeight()) .'x'. intval($pdf->GetPageWidth());
+    switch($page) {
+        case '297x210': return ['A4', 'P'];
+        case '210x297': return ['A4', 'L'];
+        case '420x297': return ['A3', 'P'];
+        case '297x420': return ['A3', 'L'];
+        case '148x210': return ['A5', 'P'];
+        case '210x148': return ['A5', 'L'];
+        /* not sure about letter/legal dimensions, it such a mess */
+        case '216x279': return ['Letter', 'P'];
+        case '279x216': return ['Letter', 'L'];
+        case '356x279': return ['Legal', 'P'];
+        case '279x356': return ['Legal', 'L'];
+    }
 }
 
-function splitter (string $filename) {
+function splitter (string $filename):Generator {
     $filename = realpath($filename);
-
     $IMagick = new Imagick();
     if (!$IMagick->setResolution(DENSITY, DENSITY)) { return false; }
     if (!$IMagick->readImage($filename)) { return false; }
@@ -30,8 +43,8 @@ function splitter (string $filename) {
     $doc = 0;
     $from = 0;
     $rotate = 0;
+    $format = ['A4', 'P'];
     for ($i = 0; $i < $IMagick->getNumberImages(); $i++) {   
-
         $IMagick->setIteratorIndex($i);
         $im = $IMagick->getImage();
         
@@ -41,12 +54,10 @@ function splitter (string $filename) {
         $im->cropImage(QRSIZE, QRSIZE, ($w / 2) - (QRSIZE / 2), QRYPOS);
         $im->setImageFormat('png');
         $im->writeImage($i . '.png');
-        $output = [];
         $qrreader = new QRReader($im->getImageBlob(), QRReader::SOURCE_TYPE_BLOB);
         $im->destroy();
         $text = $qrreader->text(['TRY_HARDER' => true]);
         if ($text !== false && preg_match('/\+\+\+BIZCUIT_SEPARATOR_PAGE_([A|B|C|D])\+\+\+/i', $text, $matches)) {
-            echo 'SEPARATOR PAGE ';
             $rotate = 0;
             switch($matches[1]) {
                 case 'B': $rotate = 90; break;
@@ -55,27 +66,26 @@ function splitter (string $filename) {
             }
             $pdf = new Fpdi();
             $pdf->setSourceFile($filename);
+            $format = getPDFFormat($pdf);
             for ($j = $from; $j < $i; $j++) {
-                $pdf->AddPage('P', 'A4', $rotate);
+                $pdf->AddPage($format[1], $format[0], $rotate);
                 $pdf->useTemplate($pdf->importPage($j + 1));
             }
-            $pdf->Output('file' . $doc . '.pdf', 'F');
+            yield $pdf->Output('S');
             $doc++;
             $from = $i + 1;
             
             continue;
-        }
-        
-        
-        
+        }        
     }
-    if ($i < $j) {
+    if ($from < $i) {
         $pdf = new Fpdi();
         $pdf->setSourceFile($filename);
+        $format = getPDFFormat($pdf);
         for ($j = $from; $j < $i; $j++) {
-            $pdf->AddPage('P', 'A4', $rotate);
+            $pdf->AddPage($format[1], $format[0], $rotate);
             $pdf->useTemplate($pdf->importPage($j + 1));
         }
-        $pdf->Output('file' . $doc . '.pdf', 'F');
+        yield $pdf->Output('S');
     }
 }
