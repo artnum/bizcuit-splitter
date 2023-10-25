@@ -1,12 +1,10 @@
 <?php
 namespace BizCuit\Splitter;
-require_once(__DIR__ . '/vendor/autoload.php');
 
-define('DENSITY', 300);
-/* DENSITY is in INCHES per PIXELS, so 300 DPI is 300/25.4 = 11.811023622 pixels */	
-define('RATIO', DENSITY / 25.4);
-define('QRSIZE', 60 * RATIO);
-define('QRYPOS', 5 * RATIO);
+const DENSITY = 300;
+const RATIO = DENSITY / 25.4;
+const QRSIZE = 60 * RATIO;
+const QRYPOS = 5 * RATIO;
 
 use Generator;
 use setasign\Fpdi\Tfpdf\Fpdi;
