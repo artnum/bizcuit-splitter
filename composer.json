@@ -1,4 +1,17 @@
 {
+    "name": "artnum/bizcuit-splitter",
+    "description": "Split a PDF at the separator page",
+    "license": "MIT",
+    "keywords": ["pdf ","split", "scan", "rotate"],
+    "authors": [{
+        "name": "Etienne Bagnoud",
+        "email": "etienne@artnum.ch",
+        "homepage": "https://artnum.ch",
+        "role": "Developper"
+    }],
+    "autoload": {
+        "files": ["./splitter.php" ]
+    },
     "require": {
         "khanamiryan/qrcode-detector-decoder": "^2.0",
         "setasign/fpdi": "^2.5",

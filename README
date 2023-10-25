@@ -1,0 +1,16 @@
+PDF Splitter
+------------
+
+Split a PDF into multiple file where the separator page is found. It is
+designed to scan a bunch of documents by just adding a page at the separation
+point.
+
+For recto-verso scanning, printing both side of with the separator page should
+do the trick. I haven't, yet, tested because I don't own a recto-verso scanner.
+
+The resulting PDFs will be rotated correctly if the separator page is oriented
+as the document.
+
+The serpartor page need to be put AFTER the document. If all the documents in
+the stack are oriented the same way, you don't need to put the last separator
+page.
