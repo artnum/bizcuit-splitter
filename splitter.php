@@ -77,10 +77,9 @@ function splitter (string $filename):Generator {
     if (!$IMagick->setImageBackgroundColor($whiteColor)) { return false; }
     
     $from = 0;
-    $end = 0;
     $rotate = 0;
     $format = ['A4', 'P'];
-    $max = $IMagick->getNumberImages();
+    $end = $max = $IMagick->getNumberImages();
     /* in case someone put a separator page at the beginning of the document */
     while (getSeparatorPage($IMagick, $from) !== false) { $from++; }
     for ($i = 0; $i < $max; $i++) {   
