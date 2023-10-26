@@ -29,6 +29,45 @@ function getPDFFormat ($pdf) {
     }
 }
 
+
+function getSeparatorPage (Imagick $IMagick, int $imageNumber):string|false {
+    $IMagick->setIteratorIndex($imageNumber);
+    $im = $IMagick->getImage();
+    
+    $w = $im->getImageWidth();
+    if ($w < QRSIZE) { return false; }
+    $im->setImageAlphaChannel(Imagick::ALPHACHANNEL_REMOVE);
+    $im->cropImage(QRSIZE, QRSIZE, ($w / 2) - (QRSIZE / 2), QRYPOS);
+
+    /* As QR Code are quite big, when scanning with a low end scanner qr is 
+     * filled with white spots. Bluring, contrast and scaling remove those
+     * spots.
+     */
+    $im->adaptiveBlurImage(0, 1);
+    $im->brightnessContrastImage(0, 100);
+    $im->scaleImage(QRSIZE / 1.4, QRSIZE / 1.4);
+    $im->setImageFormat('png');
+
+    $qrreader = new QRReader($im->getImageBlob(), QRReader::SOURCE_TYPE_BLOB);
+    $im->destroy();
+    $text = $qrreader->text(['TRY_HARDER' => true]);
+    if ($text !== false && preg_match('/\+\+\+BIZCUIT_SEPARATOR_PAGE_([A|B|C|D])\+\+\+/i', $text, $matches)) {
+        return $matches[1];
+    }
+    return false;
+}
+
+function createPDFFrom (string $source, int $from, int $to, array $format, $rotate):string {
+    $pdf = new Fpdi();
+    $pdf->setSourceFile($source);
+    $format = getPDFFormat($pdf);
+    for ($j = $from; $j < $to; $j++) {
+        $pdf->AddPage($format[1], $format[0], $rotate);
+        $pdf->useTemplate($pdf->importPage($j + 1));
+    }
+    return $pdf->Output('S');
+}
+
 function splitter (string $filename):Generator {
     $filename = realpath($filename);
     $IMagick = new Imagick();
@@ -37,52 +76,40 @@ function splitter (string $filename):Generator {
     $whiteColor = new ImagickPixel('white');
     if (!$IMagick->setImageBackgroundColor($whiteColor)) { return false; }
     
-    $pdf = new Fpdi();
-    $doc = 0;
     $from = 0;
+    $end = 0;
     $rotate = 0;
     $format = ['A4', 'P'];
-    for ($i = 0; $i < $IMagick->getNumberImages(); $i++) {   
-        $IMagick->setIteratorIndex($i);
-        $im = $IMagick->getImage();
-        
-        $w = $im->getImageWidth();
-        if ($w < QRSIZE) { continue; }
-        $im->setImageAlphaChannel(Imagick::ALPHACHANNEL_REMOVE);
-        $im->cropImage(QRSIZE, QRSIZE, ($w / 2) - (QRSIZE / 2), QRYPOS);
-        $im->setImageFormat('png');
-        $qrreader = new QRReader($im->getImageBlob(), QRReader::SOURCE_TYPE_BLOB);
-        $im->destroy();
-        $text = $qrreader->text(['TRY_HARDER' => true]);
-        if ($text !== false && preg_match('/\+\+\+BIZCUIT_SEPARATOR_PAGE_([A|B|C|D])\+\+\+/i', $text, $matches)) {
+    $max = $IMagick->getNumberImages();
+    /* in case someone put a separator page at the beginning of the document */
+    while (getSeparatorPage($IMagick, $from) !== false) { $from++; }
+    for ($i = 0; $i < $max; $i++) {   
+        if (($rotationType = getSeparatorPage($IMagick, $i)) !== false) {
             $rotate = 0;
-            switch($matches[1]) {
+            switch($rotationType) {
                 case 'B': $rotate = 90; break;
                 case 'C': $rotate = 180; break;
                 case 'D': $rotate = 270; break;
             }
-            $pdf = new Fpdi();
-            $pdf->setSourceFile($filename);
-            $format = getPDFFormat($pdf);
-            for ($j = $from; $j < $i; $j++) {
-                $pdf->AddPage($format[1], $format[0], $rotate);
-                $pdf->useTemplate($pdf->importPage($j + 1));
+            /* when doing r/v scan, there's two separator page in a row. Avoid
+             * creating a blank pdf
+             */
+            if ($from !== $i) {
+                yield createPDFFrom($filename, $from, $i, $format, $rotate);
             }
-            yield $pdf->Output('S');
-            $doc++;
-            $from = $i + 1;
-            
+            /* save in case we break out the loop */
+            $end = $i;
+            /* skip verso separator page */
+            $i++;
+            while ($i < $max && getSeparatorPage($IMagick, $i) !== false) { $i++; }
+
+            if ($i >= $max) { break; }
+            $from = $i;
             continue;
         }        
     }
-    if ($from < $i) {
-        $pdf = new Fpdi();
-        $pdf->setSourceFile($filename);
-        $format = getPDFFormat($pdf);
-        for ($j = $from; $j < $i; $j++) {
-            $pdf->AddPage($format[1], $format[0], $rotate);
-            $pdf->useTemplate($pdf->importPage($j + 1));
-        }
-        yield $pdf->Output('S');
+        
+    if ($from < $max) {
+        yield createPDFFrom($filename, $from, $end, $format, $rotate);
     }
 }
