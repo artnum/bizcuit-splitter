@@ -51,7 +51,6 @@ function splitter (string $filename):Generator {
         $im->setImageAlphaChannel(Imagick::ALPHACHANNEL_REMOVE);
         $im->cropImage(QRSIZE, QRSIZE, ($w / 2) - (QRSIZE / 2), QRYPOS);
         $im->setImageFormat('png');
-        $im->writeImage($i . '.png');
         $qrreader = new QRReader($im->getImageBlob(), QRReader::SOURCE_TYPE_BLOB);
         $im->destroy();
         $text = $qrreader->text(['TRY_HARDER' => true]);
