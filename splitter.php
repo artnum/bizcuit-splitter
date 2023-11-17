@@ -107,8 +107,7 @@ function splitter (string $filename):Generator {
             continue;
         }        
     }
-        
     if ($from < $max) {
-        yield createPDFFrom($filename, $from, $end, $format, $rotate);
+        yield createPDFFrom($filename, $from, $max, $format, $rotate);
     }
 }
